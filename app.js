@@ -1,6 +1,10 @@
 const express = require('express');
 const app  = express();
 
+const { engine } = require('express-handlebars');
+app.engine('handlebars', engine({ defaultLayout: false }));
+
+
 const connection = require('./database');
 
 // serve static assets from public folder
@@ -10,13 +14,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 
-app.set('view engine', 'pug');
+app.set('view engine', 'handlebars');
 app.set('views', './views');
 
+// start
 app.get('/', (req, res) => {
     res.render('index');
 });
 
+// Result show
 app.get('/result', (req, res) => {
   connection.query('SELECT * FROM registrations', (err, results) => {
     if (err) {
@@ -27,6 +33,7 @@ app.get('/result', (req, res) => {
   });
 });
 
+// Form er post handle
 app.post('/result', (req, res) => {
   const { name, classRoll, department, year, semester, address } = req.body;
 
@@ -44,21 +51,23 @@ app.post('/result', (req, res) => {
         console.error(err);
         return res.status(500).send('Error inserting data');
       }
-
-      // After insert → fetch all data
+      
+      // show all data
       connection.query('SELECT * FROM registrations', (err, results) => {
         if (err) {
           console.error(err);
           return res.status(500).send('Error fetching data');
         }
 
-        // Now render result.pug with ALL data
+        // Now render ALL data
         res.render('result', { data: results });
       });
     }
   );
 });
 
+
+// update handle
 app.post('/result/update/:id', (req, res) => {
   const id = req.params.id;
   const { name, classRoll, department, year, semester, address } = req.body;
@@ -78,7 +87,7 @@ app.post('/result/update/:id', (req, res) => {
         return res.status(500).send('Error updating data');
       } 
       else {
-        res.redirect('/result'); // Redirect to the result page to see updated data
+        res.redirect('/result'); // Redirect to the result page
       }
     }
   );
@@ -86,7 +95,7 @@ app.post('/result/update/:id', (req, res) => {
 
 
 
-// Delete route
+// Delete handle
 app.post('/delete/:id', (req, res) => {
   const id = req.params.id;
 
@@ -103,7 +112,7 @@ app.post('/delete/:id', (req, res) => {
 });
 
 
-// Edit route - to fetch data for the specific id and render the edit form
+// Edit handle 
 app.post('/edit/:id', (req, res) => {
   const id = req.params.id;
 
@@ -118,6 +127,29 @@ app.post('/edit/:id', (req, res) => {
     }
   });
 });
+
+// search handle
+app.get('/search', (req, res) => {
+  const { name } = req.query;
+
+  if (!name || name.trim() === '') {
+    return res.redirect('/result');
+  }
+
+  const searchQuery = `
+    SELECT * FROM registrations
+    WHERE name LIKE ?`;
+  connection.query(searchQuery, [`%${name}%`], (err, results) => {   // % → any number of characters  
+    if (err) {
+      console.error(err);
+      return res.status(500).send('Error searching data');
+    }
+    else {
+      res.render('result', { data: results, searchTerm: name });
+    }
+  });
+});
+
 
 
 module.exports = app;
